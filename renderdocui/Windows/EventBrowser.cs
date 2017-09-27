@@ -49,6 +49,12 @@ namespace renderdocui.Windows
             public bool marker = false;
         }
 
+        class MultiDeferredEvent : DeferredEvent
+        {
+            public UInt32 firstEventID = 0;
+        }
+
+
         private TreelistView.Node m_FrameNode = null;
 
         Dictionary<uint, List<CounterResult>> m_Times = new Dictionary<uint, List<CounterResult>>();
@@ -346,14 +352,14 @@ namespace renderdocui.Windows
                 }
             }
 
-            DeferredEvent def = new DeferredEvent();
-            def.eventID = eventNum;
-            def.marker = (drawcall.flags & DrawcallFlags.SetMarker) != 0;
-
-            drawNode.Tag = def;
-
             if (drawcall.children != null && drawcall.children.Length > 0)
             {
+                MultiDeferredEvent def = new MultiDeferredEvent();
+                def.eventID = eventNum;
+                def.marker = (drawcall.flags & DrawcallFlags.SetMarker) != 0;
+                drawNode.Tag = def;
+                def.firstEventID = eventNum;
+
                 for (int i = 0; i < drawcall.children.Length; i++)
                 {
                     AddDrawcall(drawcall.children[i], drawNode);
@@ -374,14 +380,20 @@ namespace renderdocui.Windows
                     DeferredEvent t = drawNode.Nodes[i].Tag as DeferredEvent;
                     if (t != null && !t.marker)
                     {
-                        drawNode.Tag = drawNode.Nodes[i].Tag;
+                        def.eventID = (drawNode.Nodes[i].Tag as DeferredEvent).eventID;
                         found = true;
                         break;
                     }
                 }
 
                 if (!found && !drawNode.Nodes.IsEmpty())
-                    drawNode.Tag = drawNode.Nodes.LastNode.Tag;
+                    def.eventID = (drawNode.Nodes.LastNode.Tag as DeferredEvent).eventID; ;
+            } else
+            {
+                DeferredEvent def = new DeferredEvent();
+                def.eventID = eventNum;
+                def.marker = (drawcall.flags & DrawcallFlags.SetMarker) != 0;
+                drawNode.Tag = def;
             }
 
             if (drawNode.Nodes.IsEmpty() && (drawcall.flags & DrawcallFlags.PushMarker) != 0 && m_Core.Config.EventBrowser_HideEmpty)
@@ -456,8 +468,6 @@ namespace renderdocui.Windows
             for (int i = 0; i < drawcalls.Length; i++)
                 AddDrawcall(drawcalls[i], frame);
 
-            frame.Tag = frame.Nodes.LastNode.Tag;
-
             eventView.EndUpdate();
         }
 
@@ -500,7 +510,25 @@ namespace renderdocui.Windows
             {
                 m_FrameNode = eventView.Nodes.Add(MakeMarker("Frame #" + m_Core.FrameInfo.frameNumber.ToString()));
 
-                AddFrameDrawcalls(m_FrameNode, m_Core.GetDrawcalls());
+                MultiDeferredEvent evt = new MultiDeferredEvent();
+                evt.firstEventID = 0;
+                evt.eventID = 0;
+                evt.marker = false;
+                m_FrameNode.Tag = evt;
+
+                FetchDrawcall[] drawCalls = m_Core.GetDrawcalls();
+
+                if(drawCalls.Length > 0)
+                {
+                    evt.firstEventID = drawCalls[0].eventID;
+                }
+
+                if (drawCalls.Length > 0)
+                {
+                    evt.eventID = drawCalls[drawCalls.Length - 1].eventID;
+                }
+
+                AddFrameDrawcalls(m_FrameNode, drawCalls);
             }
 
             eventView.EndUpdate();
@@ -514,8 +542,6 @@ namespace renderdocui.Windows
                 DeferredEvent evt = eventView.Nodes[0].Nodes.LastNode.Tag as DeferredEvent;
 
                 m_Core.SetEventID(null, evt.eventID + 1);
-
-                m_FrameNode.Tag = evt;
 
                 eventView.NodesSelection.Clear();
                 eventView.NodesSelection.Add(eventView.Nodes[0]);
@@ -731,6 +757,17 @@ namespace renderdocui.Windows
             if (eventView.SelectedNode.Tag != null)
             {
                 DeferredEvent def = eventView.SelectedNode.Tag as DeferredEvent;
+
+                UInt32 from = def.eventID;
+                UInt32 to = def.eventID;
+
+                MultiDeferredEvent mdef = eventView.SelectedNode.Tag as MultiDeferredEvent;
+                if (mdef != null)
+                {
+                    from = mdef.firstEventID;
+                }
+
+                m_Core.GetExporterView().SetActiveEventRange(from, to);
                 m_Core.SetEventID(this, def.eventID);
 
                 FetchDrawcall draw = m_Core.CurDrawcall;
@@ -1156,8 +1193,64 @@ namespace renderdocui.Windows
             SelectColumns();
         }
 
+        private void addSelectedToExport_Click(object sender, EventArgs e)
+        {
+            if (eventView.SelectedNode.Tag == null)
+            {
+                return;
+            }
+
+            DeferredEvent def = eventView.SelectedNode.Tag as DeferredEvent;
+            if (def == null)
+            {
+                return;
+            }
+
+            UInt32 from = def.eventID;
+            UInt32 to = def.eventID;
+
+            MultiDeferredEvent mdef = eventView.SelectedNode.Tag as MultiDeferredEvent;
+            if (mdef != null)
+            {
+                from = mdef.firstEventID;
+            }
+
+            m_Core.GetExporterView().AddEventRange(from, to);
+        }
+        
+
         private void eventViewRightClick_Opening(object sender, CancelEventArgs e)
         {
+            if (eventView.SelectedNode.Tag != null)
+            {
+                MultiDeferredEvent mdef = eventView.SelectedNode.Tag as MultiDeferredEvent;
+                if (mdef != null)
+                {
+                    addSelectedToExport.Enabled = true;
+                    addSelectedToExport.Text = string.Format("Add EID ({0} - {1}) to FBX Exporter", mdef.firstEventID, mdef.eventID);
+                } else
+                {
+                    DeferredEvent def = eventView.SelectedNode.Tag as DeferredEvent;
+                    if (def != null)
+                    {
+                        FetchDrawcall dc = m_Core.GetDrawcall(def.eventID);
+                        if ((dc != null) && (dc.topology == PrimitiveTopology.TriangleList) && (dc.flags & DrawcallFlags.Drawcall) != 0)
+                        {
+                            addSelectedToExport.Enabled = true;
+                            addSelectedToExport.Text = string.Format("Add EID ({0}) to FBX Exporter", def.eventID);
+                        } else
+                        {
+                            addSelectedToExport.Enabled = false;
+                            addSelectedToExport.Text = string.Format("Add Selected EID to FBX Exporter", def.eventID);
+                        }
+                    } else
+                    {
+                        addSelectedToExport.Enabled = false;
+                        addSelectedToExport.Text = string.Format("Add Selected EID to FBX Exporter", def.eventID);
+                    }
+                }
+            }
+
             collapseAll.Enabled = expandAll.Enabled = (eventView.SelectedNode != null && eventView.SelectedNode.HasChildren);
         }
 

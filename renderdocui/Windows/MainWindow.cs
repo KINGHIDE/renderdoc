@@ -547,6 +547,8 @@ namespace renderdocui.Windows
                 return m_Core.GetDebugMessages();
             else if (IsPersist(persistString, typeof(TimelineBar).ToString()))
                 return m_Core.GetTimelineBar();
+            else if (IsPersist(persistString, typeof(ExporterView).ToString()))
+                return m_Core.GetExporterView();
             else if (IsPersist(persistString, typeof(StatisticsViewer).ToString()))
                 return m_Core.GetStatisticsViewer();
             else if (IsPersist(persistString, typeof(Dialogs.PythonShell).ToString()))
@@ -1949,6 +1951,12 @@ namespace renderdocui.Windows
         {
             m_Core.GetStatisticsViewer().Show(dockPanel);
         }
+
+        private void exporterViewToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            m_Core.GetExporterView().Show(dockPanel);
+        }
+
 
         #endregion
 

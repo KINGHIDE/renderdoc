@@ -156,6 +156,104 @@ namespace renderdocui.Code
             }
         }
 
+        public bool IsExportDepth
+        {
+            get
+            {
+                bool writeToDepth = false;
+                bool depthTargetBound = false;
+
+                if (LogLoaded)
+                {
+                    if (IsLogD3D11)
+                    {
+                        depthTargetBound = m_D3D11.m_OM.DepthTarget.Resource != ResourceId.Null;
+                        writeToDepth = m_D3D11.m_OM.m_State.DepthWrites && m_D3D11.m_OM.m_State.DepthEnable;
+                    }
+                    else if (IsLogD3D12)
+                    {
+                        depthTargetBound = m_D3D12.m_OM.DepthTarget.Resource != ResourceId.Null;
+                        writeToDepth = m_D3D12.m_OM.m_State.DepthWrites && m_D3D12.m_OM.m_State.DepthEnable;
+                    }
+                    else if (IsLogGL)
+                    {
+                        depthTargetBound = m_GL.m_FB.m_DrawFBO.Depth.Obj != ResourceId.Null;
+                        writeToDepth = m_GL.m_DepthState.DepthWrites && m_GL.m_DepthState.DepthEnable;
+                    }
+                    else if (IsLogVK)
+                    {
+                        var rp = m_Vulkan.Pass.renderpass;
+                        var fb = m_Vulkan.Pass.framebuffer;
+
+                        if (rp.depthstencilAttachment >= 0 && rp.depthstencilAttachment < fb.attachments.Length)
+                        {
+                            depthTargetBound = fb.attachments[rp.depthstencilAttachment].img != ResourceId.Null;
+                            writeToDepth = m_Vulkan.DS.depthWriteEnable;
+                        }
+                    }
+                }
+
+                return depthTargetBound && writeToDepth;
+            }
+        }
+
+
+        public bool IsExportColor
+        {
+            get
+            {
+                BoundResource[] renderTargets = GetOutputTargets();
+                byte[] writeMasks = null;
+
+                if (IsLogD3D11)
+                {
+                    writeMasks = new byte[m_D3D11.m_OM.m_BlendState.Blends.Length];
+                    for (int i = 0; i < writeMasks.Length; i++)
+                    {
+                        writeMasks[i] = m_D3D11.m_OM.m_BlendState.Blends[i].WriteMask;
+                    }
+                }
+                else if (IsLogD3D12)
+                {
+                    writeMasks = new byte[m_D3D12.m_OM.m_BlendState.Blends.Length];
+                    for (int i = 0; i < writeMasks.Length; i++)
+                    {
+                        writeMasks[i] = m_D3D12.m_OM.m_BlendState.Blends[i].WriteMask;
+                    }
+
+                } else if (IsLogGL)
+                {
+                    writeMasks = new byte[m_GL.m_FB.m_BlendState.Blends.Length];
+                    for (int i = 0; i < writeMasks.Length; i++)
+                    {
+                        writeMasks[i] = m_GL.m_FB.m_BlendState.Blends[i].WriteMask;
+                    }
+                } else if (IsLogVK)
+                {
+                    writeMasks = new byte[m_Vulkan.CB.attachments.Length];
+                    for (int i = 0; i < writeMasks.Length; i++)
+                    {
+                        writeMasks[i] = m_Vulkan.CB.attachments[i].WriteMask;
+                    }
+                }
+
+                if (writeMasks == null)
+                {
+                    return false;
+                }
+
+                int count = Math.Min(writeMasks.Length, renderTargets.Length);
+                for(int i = 0; i < count; i++)
+                {
+                    if (renderTargets[i].Id != ResourceId.Null && writeMasks[i] != 0)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
         public bool SupportsResourceArrays
         {
             get

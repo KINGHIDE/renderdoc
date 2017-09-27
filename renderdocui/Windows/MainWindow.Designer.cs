@@ -90,6 +90,7 @@
             this.debugMessagesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.timelineToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.statisticsViewerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.exporterViewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.resolveSymbolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator11 = new System.Windows.Forms.ToolStripSeparator();
@@ -287,7 +288,8 @@
             this.meshOutputToolStripMenuItem,
             this.debugMessagesToolStripMenuItem,
             this.timelineToolStripMenuItem,
-            this.statisticsViewerToolStripMenuItem});
+            this.statisticsViewerToolStripMenuItem,
+            this.exporterViewToolStripMenuItem});
             this.windowToolStripMenuItem.Name = "windowToolStripMenuItem";
             this.windowToolStripMenuItem.Size = new System.Drawing.Size(57, 20);
             this.windowToolStripMenuItem.Text = "&Window";
@@ -511,6 +513,13 @@
             this.statisticsViewerToolStripMenuItem.Size = new System.Drawing.Size(192, 22);
             this.statisticsViewerToolStripMenuItem.Text = "Statisti&cs Viewer";
             this.statisticsViewerToolStripMenuItem.Click += new System.EventHandler(this.statisticsViewerToolStripMenuItem_Click);
+            // 
+            // exporterViewToolStripMenuItem
+            // 
+            this.exporterViewToolStripMenuItem.Name = "exporterViewToolStripMenuItem";
+            this.exporterViewToolStripMenuItem.Size = new System.Drawing.Size(192, 22);
+            this.exporterViewToolStripMenuItem.Text = "FBX Exporter";
+            this.exporterViewToolStripMenuItem.Click += new System.EventHandler(this.exporterViewToolStripMenuItem_Click);
             // 
             // toolsToolStripMenuItem
             // 
@@ -928,6 +937,7 @@
         private System.Windows.Forms.ToolStripMenuItem showTipsToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator12;
         private System.Windows.Forms.ToolStripMenuItem statisticsViewerToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem exporterViewToolStripMenuItem;
         private System.Windows.Forms.ToolStripDropDownButton contextChooser;
         private System.Windows.Forms.ToolStripMenuItem localContext;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator13;

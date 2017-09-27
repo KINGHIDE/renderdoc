@@ -92,6 +92,7 @@ namespace renderdocui.Code
         private BufferViewer m_MeshViewer = null;
         private PipelineStateViewer m_PipelineStateViewer = null;
         private StatisticsViewer m_StatisticsViewer = null;
+        private ExporterView m_ExporterView = null;
 
         #endregion
 
@@ -883,7 +884,19 @@ namespace renderdocui.Code
             return m_StatisticsViewer;
         }
 
-		public void AddLogProgressListener(ILogLoadProgressListener p)
+        public ExporterView GetExporterView()
+        {
+            if (m_ExporterView == null || m_ExporterView.IsDisposed)
+            {
+                m_ExporterView = new ExporterView(this);
+                AddLogViewer(m_ExporterView);
+            }
+
+            return m_ExporterView;
+        }
+
+
+        public void AddLogProgressListener(ILogLoadProgressListener p)
         {
             m_ProgressListeners.Add(p);
         }

@@ -43,6 +43,7 @@
             this.expandAll = new System.Windows.Forms.ToolStripMenuItem();
             this.collapseAll = new System.Windows.Forms.ToolStripMenuItem();
             this.selectVisibleColumnsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.addSelectedToExport = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.findEventButton = new System.Windows.Forms.ToolStripButton();
@@ -168,7 +169,8 @@
             this.eventViewRightClick.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.expandAll,
             this.collapseAll,
-            this.selectVisibleColumnsToolStripMenuItem});
+            this.selectVisibleColumnsToolStripMenuItem,
+            this.addSelectedToExport});
             this.eventViewRightClick.Name = "contextMenuStrip1";
             this.eventViewRightClick.Size = new System.Drawing.Size(179, 70);
             this.eventViewRightClick.Opening += new System.ComponentModel.CancelEventHandler(this.eventViewRightClick_Opening);
@@ -196,6 +198,14 @@
             this.selectVisibleColumnsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
             this.selectVisibleColumnsToolStripMenuItem.Text = "Select &Visible Columns";
             this.selectVisibleColumnsToolStripMenuItem.Click += new System.EventHandler(this.selectVisibleColumnsToolStripMenuItem_Click);
+            //
+            //exportAllToFilesMenuItem
+            //
+            this.addSelectedToExport.Image = global::renderdocui.Properties.Resources.add;
+            this.addSelectedToExport.Name = "addSelectedToExport";
+            this.addSelectedToExport.Size = new System.Drawing.Size(178, 22);
+            this.addSelectedToExport.Text = "Add Selected EID to FBX Exporter";
+            this.addSelectedToExport.Click += new System.EventHandler(this.addSelectedToExport_Click);
             // 
             // toolStrip1
             // 
@@ -473,6 +483,7 @@
         private System.Windows.Forms.ToolStripButton selectColumnsButton;
         private System.Windows.Forms.ContextMenuStrip eventViewRightClick;
         private System.Windows.Forms.ToolStripMenuItem selectVisibleColumnsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem addSelectedToExport;
         private System.Windows.Forms.Timer findHighlight;
         private System.Windows.Forms.ToolStrip bookmarkStrip;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
