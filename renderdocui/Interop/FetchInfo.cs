@@ -626,6 +626,24 @@ namespace renderdoc
         public UInt32 vertexOffset;
         public UInt32 instanceOffset;
 
+        public UInt32 numTris
+        {
+            get
+            {
+                if (topology == PrimitiveTopology.TriangleList)
+                {
+                    return numIndices / 3;
+                }
+
+                if (topology == PrimitiveTopology.TriangleStrip)
+                {
+                    return numIndices - 2;
+                }
+
+                throw new Exception("Bad topology!");
+            }
+        }
+
         [CustomMarshalAs(CustomUnmanagedType.FixedArray, FixedLength = 3)]
         public UInt32[] dispatchDimension;
         [CustomMarshalAs(CustomUnmanagedType.FixedArray, FixedLength = 3)]

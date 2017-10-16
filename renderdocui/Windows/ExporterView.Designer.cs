@@ -159,7 +159,7 @@
             this.exportWorldXForms.Name = "exportWorldXForms";
             this.exportWorldXForms.Size = new System.Drawing.Size(207, 17);
             this.exportWorldXForms.TabIndex = 4;
-            this.exportWorldXForms.Text = "Caclulate World XForms (experimental)";
+            this.exportWorldXForms.Text = "Calculate World XForms (experimental)";
             this.exportWorldXForms.UseVisualStyleBackColor = true;
             // 
             // exportFrustums

@@ -753,6 +753,7 @@ namespace renderdocui.Windows
         private class DataFetcherRawData
         {
             public string name;
+            public PrimitiveTopology topology;
             public UInt32 eventId;
             public UInt32 numTris;
             public UInt32 numInstances;
@@ -798,6 +799,7 @@ namespace renderdocui.Windows
         private class DataFetcherResult
         {
             public string name;
+            public PrimitiveTopology topology;
             public UInt32 eventId;
             public UInt32 numTris;
             public UInt32 numInstances;
@@ -900,8 +902,9 @@ namespace renderdocui.Windows
                     r.SetFrameEvent(dc.eventID, false);
 
                     rawResult.name = String.Copy(dc.name);
+                    rawResult.topology = dc.topology;
                     rawResult.eventId = dc.eventID;
-                    rawResult.numTris = dc.numIndices / 3;
+                    rawResult.numTris = dc.numTris;
 
                     APIProperties apiProperties = r.GetAPIProperties();
                     D3D11PipelineState d3D11PipelineState = r.GetD3D11PipelineState();
@@ -1026,9 +1029,16 @@ namespace renderdocui.Windows
                             index = indexReader.ReadUInt32();
                         }
                         indexBuffer[i] = index;
+
                         minIndex = Math.Min(minIndex, index);
-                        maxIndex = Math.Max(maxIndex, index);
+
+                        //skip strip restart indices 
+                        if (!isIndexRestartEnabled || index != indexRestartValue)
+                        {
+                            maxIndex = Math.Max(maxIndex, index);
+                        }
                     }
+
                     rawResult.indexBuffer = indexBuffer;
                     rawResult.minIndex = minIndex;
                     rawResult.maxIndex = maxIndex;
@@ -1072,6 +1082,7 @@ namespace renderdocui.Windows
                             }
 
                             postIndexBuffer[i] = index;
+                            //skip strip restart indices 
                             if (!isIndexRestartEnabled || index != indexRestartValue)
                             {
                                 postMaxIndex = Math.Max(postMaxIndex, index);
@@ -1575,6 +1586,7 @@ namespace renderdocui.Windows
                 DataFetcherResult result = new DataFetcherResult();
 
                 result.name = data.name;
+                result.topology = data.topology;
                 result.eventId = data.eventId;
                 result.numTris = data.numTris;
                 result.numInstances = data.numInstances;
@@ -1588,6 +1600,7 @@ namespace renderdocui.Windows
                 result.vertexDataInstances = new VertexEx[numInstances][];
                 result.hasLocalNormals = true;
 
+
                 for (uint instanceIndex = 0; instanceIndex < numInstances; instanceIndex++)
                 {
                     VertexEx[] vertexData = new VertexEx[verticesCount];
@@ -1599,6 +1612,12 @@ namespace renderdocui.Windows
 
                         UInt32 vertexIndex = indice - data.minIndex;
                         result.indexBuffer[i] = vertexIndex;
+
+                        //Skip tristrip restart indices (out of range)
+                        if (vertexIndex >= vertexData.Length)
+                        {
+                            continue;
+                        }
 
                         // Apply base vertex
                         if (data.baseVertex < 0)
@@ -2259,11 +2278,13 @@ namespace renderdocui.Windows
 
                 if (((dc.flags & DrawcallFlags.Drawcall) == 0) || ((dc.flags & DrawcallFlags.UseIBuffer) == 0))
                 {
+                    StaticExports.LogText(String.Format("Drawcall {0} does not use Index Buffer - ignore.", eventId));
                     continue;
                 }
 
-                if (dc.topology != PrimitiveTopology.TriangleList)
+                if (dc.topology != PrimitiveTopology.TriangleList && dc.topology != PrimitiveTopology.TriangleStrip)
                 {
+                    StaticExports.LogText(String.Format("Drawcall {0} has unsupported topology {1} - ignore.", eventId, dc.topology));
                     continue;
                 }
 
@@ -2275,7 +2296,7 @@ namespace renderdocui.Windows
                         numInstances = 1;
                     }
 
-                    UInt32 numTris = dc.numIndices / 3;
+                    UInt32 numTris = dc.numTris;
 
                     ListItemData data = new ListItemData();
                     data.name = dc.name;
@@ -3041,7 +3062,7 @@ namespace renderdocui.Windows
 
 
 
-        static void CalcInstanceNormals(DataFetcherResult drawCall, int instanceIndex, bool worldSpace, Mat4x4 invWorldOrigin, bool isLeftHanded)
+        static void CalcInstanceNormals(DataFetcherResult drawCall, UInt32[] ib, int instanceIndex, bool worldSpace, Mat4x4 invWorldOrigin, bool isLeftHanded)
         {
             VertexEx[] vb = drawCall.vertexDataInstances[instanceIndex];
 
@@ -3078,11 +3099,12 @@ namespace renderdocui.Windows
 
             // calculate
             UInt32 triCount = drawCall.numTris;
+            UInt32 instanceIndexOffset = (UInt32)instanceIndex * drawCall.numTris * 3;
             for (UInt32 i = 0; i < triCount; i++)
             {
-                UInt32 i0 = drawCall.indexBuffer[i * 3 + 0];
-                UInt32 i1 = drawCall.indexBuffer[i * 3 + 1];
-                UInt32 i2 = drawCall.indexBuffer[i * 3 + 2];
+                UInt32 i0 = ib[instanceIndexOffset + i * 3 + 0];
+                UInt32 i1 = ib[instanceIndexOffset + i * 3 + 1];
+                UInt32 i2 = ib[instanceIndexOffset + i * 3 + 2];
 
                 if (i0 >= vb.Length || i1 >= vb.Length || i2 >= vb.Length)
                 {
@@ -3124,7 +3146,7 @@ namespace renderdocui.Windows
         }
 
 
-        static VertexFbx[] GetFbxVertexBuffer(DataFetcherResult drawCall, bool isWorldSpace, Mat4x4 invWorldOrigin, Mat4x4 worldOrigin, bool isLeftHanded, FbxExportOptions exportOptions)
+        static VertexFbx[] GetFbxVertexBuffer(DataFetcherResult drawCall, UInt32[] ib, bool isWorldSpace, Mat4x4 invWorldOrigin, Mat4x4 worldOrigin, bool isLeftHanded, FbxExportOptions exportOptions)
         {
             int vCount = 0;
             for (int i = 0; i < drawCall.numInstances; i++)
@@ -3162,7 +3184,7 @@ namespace renderdocui.Windows
 
                 if (needToCalculateNormals)
                 {
-                    CalcInstanceNormals(drawCall, inst, isWorldSpace, invWorldOrigin, isLeftHanded);
+                    CalcInstanceNormals(drawCall, ib, inst, isWorldSpace, invWorldOrigin, isLeftHanded);
                 }
 
                 VertexEx[] vb = drawCall.vertexDataInstances[inst];
@@ -3216,33 +3238,71 @@ namespace renderdocui.Windows
 
         static UInt32[] GetFbxIndexBuffer(DataFetcherResult drawCall, bool isLeftHanded)
         {
-            int iCount = drawCall.indexBuffer.Length * (int)drawCall.numInstances;
+            UInt32[] res = null;
 
-            int gIndex = 0;
-            UInt32[] res = new UInt32[iCount];
-
-            UInt32 ioffset = 0;
-            for (int inst = 0; inst < drawCall.numInstances; inst++)
+            // convert tristrip index buffer to trilist index buffer
+            if (drawCall.topology == PrimitiveTopology.TriangleStrip)
             {
-                for (int i = 0; i < drawCall.indexBuffer.Length; i += 3, gIndex += 3)
-                {
-                    UInt32 idx0 = drawCall.indexBuffer[i + 0] + ioffset;
-                    UInt32 idx1 = drawCall.indexBuffer[i + 1] + ioffset;
-                    UInt32 idx2 = drawCall.indexBuffer[i + 2] + ioffset;
+                int triCount = (drawCall.indexBuffer.Length - 2);
+                int iCount = triCount * (int)drawCall.numInstances * 3;
+                int gIndex = 0;
+                res = new UInt32[iCount];
 
-                    if (isLeftHanded)
+                UInt32 ioffset = 0;
+                for (int inst = 0; inst < drawCall.numInstances; inst++)
+                {
+                    for (int i = 0; i < drawCall.indexBuffer.Length-2; i++, gIndex+=3)
                     {
-                        res[gIndex + 0] = idx0;
-                        res[gIndex + 1] = idx2;
-                        res[gIndex + 2] = idx1;
-                    } else
-                    {
-                        res[gIndex + 0] = idx0;
-                        res[gIndex + 1] = idx1;
-                        res[gIndex + 2] = idx2;
+                        UInt32 i0 = drawCall.indexBuffer[i + 0] + ioffset;
+                        UInt32 i1 = drawCall.indexBuffer[i + 1] + ioffset;
+                        UInt32 i2 = drawCall.indexBuffer[i + 2] + ioffset;
+
+                        if (i % 2 == 0)
+                        {
+                            res[gIndex + 0] = drawCall.indexBuffer[i + 0];
+                            res[gIndex + 1] = drawCall.indexBuffer[i + 1];
+                            res[gIndex + 2] = drawCall.indexBuffer[i + 2];
+                        }
+                        else
+                        {
+                            res[gIndex + 0] = drawCall.indexBuffer[i + 2];
+                            res[gIndex + 2] = drawCall.indexBuffer[i + 0];
+                            res[gIndex + 1] = drawCall.indexBuffer[i + 1];
+                        }
                     }
+                    ioffset += (UInt32)drawCall.vertexDataInstances[inst].Length;
                 }
-                ioffset += (UInt32)drawCall.vertexDataInstances[inst].Length;
+
+            } else if (drawCall.topology == PrimitiveTopology.TriangleList)
+            {
+                int iCount = drawCall.indexBuffer.Length * (int)drawCall.numInstances;
+                int gIndex = 0;
+                res = new UInt32[iCount];
+
+                UInt32 ioffset = 0;
+                for (int inst = 0; inst < drawCall.numInstances; inst++)
+                {
+                    for (int i = 0; i < drawCall.indexBuffer.Length; i += 3, gIndex += 3)
+                    {
+                        UInt32 idx0 = drawCall.indexBuffer[i + 0] + ioffset;
+                        UInt32 idx1 = drawCall.indexBuffer[i + 1] + ioffset;
+                        UInt32 idx2 = drawCall.indexBuffer[i + 2] + ioffset;
+
+                        if (isLeftHanded)
+                        {
+                            res[gIndex + 0] = idx0;
+                            res[gIndex + 1] = idx2;
+                            res[gIndex + 2] = idx1;
+                        }
+                        else
+                        {
+                            res[gIndex + 0] = idx0;
+                            res[gIndex + 1] = idx1;
+                            res[gIndex + 2] = idx2;
+                        }
+                    }
+                    ioffset += (UInt32)drawCall.vertexDataInstances[inst].Length;
+                }
             }
 
             return res;
@@ -3880,7 +3940,21 @@ namespace renderdocui.Windows
                 worldSpaceVertexData = false;
             }
 
-            VertexFbx[] verices = GetFbxVertexBuffer(drawCall, worldSpaceVertexData, invWorldOrigin, worldOrigin, isLeftHanded, exportOptions);
+            UInt32[] ib = GetFbxIndexBuffer(drawCall, isLeftHanded);
+            VertexFbx[] verices = GetFbxVertexBuffer(drawCall, ib, worldSpaceVertexData, invWorldOrigin, worldOrigin, isLeftHanded, exportOptions);
+
+            //Fixup tristrip restart indices (replace to degenerate triangles)
+            for(int i = 0; i < ib.Length; i+=3)
+            {
+                if (ib[i + 0] >= verices.Length ||
+                    ib[i + 1] >= verices.Length ||
+                    ib[i + 2] >= verices.Length)
+                {
+                    ib[i + 0] = 0;
+                    ib[i + 1] = 0;
+                    ib[i + 2] = 0;
+                }
+            }
 
             // emit vertices
             sb.AppendLine("\t\tVertices: *" + (verices.Length * 3) + " {");
@@ -3896,7 +3970,6 @@ namespace renderdocui.Windows
             sb.AppendLine("\t\t} ");
 
             //emit triangles
-            UInt32[] ib = GetFbxIndexBuffer(drawCall, isLeftHanded);
 
             sb.AppendLine("\t\tPolygonVertexIndex: *" + ib.Length + " {");
             sb.Append("\t\t\ta: ");
