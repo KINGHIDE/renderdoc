@@ -161,7 +161,7 @@ CaptureOptions::CaptureOptions()
   CaptureCallstacksOnlyDraws = false;
   DelayForDebugger = 0;
   VerifyMapWrites = false;
-  HookIntoChildren = false;
+  HookIntoChildren = true;
   RefAllResources = false;
   SaveAllInitials = false;
   CaptureAllCmdLists = false;

@@ -813,7 +813,7 @@ namespace renderdocui.Windows.Dialogs
         private NamedPipeServerStream pipe32 = null;
         private NamedPipeServerStream pipe64 = null;
 
-        private void EnableAppInit(RegistryKey parent, string path, string dllname, out int prevEnabled, out string prevStr)
+        private void EnableAppInit(RegistryKey parent, string dllname, out int prevEnabled, out string prevStr)
         {
             RegistryKey key = parent.OpenSubKey("Microsoft", true);
             if (key == null) { prevEnabled = 0; prevStr = ""; return; }
@@ -835,7 +835,7 @@ namespace renderdocui.Windows.Dialogs
             if (o == null || !(o is string)) { prevEnabled = 0; prevStr = ""; return; }
             prevStr = (string)o;
 
-            key.SetValue("AppInit_DLLs", Win32PInvoke.ShortPath(Path.Combine(path, dllname)));
+            key.SetValue("AppInit_DLLs", dllname);
             key.SetValue("LoadAppInit_DLLs", (int)1);
         }
 
@@ -931,7 +931,29 @@ namespace renderdocui.Windows.Dialogs
                 pipe64 = null;
             }
         }
-        
+
+        private void DeleteFileFromSystem32(string dllname)
+        {
+            string path32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
+            string filePath = Path.Combine(path32, dllname);
+
+            if (System.IO.File.Exists(filePath))
+            {
+                System.IO.File.Delete(filePath);
+            }
+        }
+
+        private string CopyFileToSystem32(string dllname, string sourceFilePath)
+        {
+            string path32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
+           
+            string destFilePath = Path.Combine(path32, dllname);
+            System.IO.File.Copy(sourceFilePath, destFilePath);
+
+            return dllname;
+            //return destFilePath;
+        }
+
         private void toggleGlobalHook_CheckedChanged(object sender, EventArgs e)
         {
             if (!toggleGlobalHook.Enabled)
@@ -1004,13 +1026,19 @@ namespace renderdocui.Windows.Dialogs
                 {
                     if (Environment.Is64BitProcess)
                     {
-                        EnableAppInit(Registry.LocalMachine.CreateSubKey("SOFTWARE").CreateSubKey("Wow6432Node"),
-                                      path, "x86\\renderdocshim32.dll",
-                                      out prevAppInitWoW64Enabled, out prevAppInitWoW64);
+                        if (System.IO.File.Exists(Path.Combine(path, "x86\\renderdocshim32.dll")))
+                        {
+                            string dllPath = CopyFileToSystem32("renderdocshim32.dll", Path.Combine(path, "x86\\renderdocshim32.dll"));
 
-                        EnableAppInit(Registry.LocalMachine.CreateSubKey("SOFTWARE"),
-                                      path, "renderdocshim64.dll",
-                                      out prevAppInitEnabled, out prevAppInit);
+                            EnableAppInit(Registry.LocalMachine.CreateSubKey("SOFTWARE").CreateSubKey("Wow6432Node"), dllPath, out prevAppInitWoW64Enabled, out prevAppInitWoW64);
+                        }
+
+                        if (System.IO.File.Exists(Path.Combine(path, "renderdocshim64.dll")))
+                        {
+                            string dllPath = CopyFileToSystem32("renderdocshim64.dll", Path.Combine(path, "renderdocshim64.dll"));
+
+                            EnableAppInit(Registry.LocalMachine.CreateSubKey("SOFTWARE"), dllPath, out prevAppInitEnabled, out prevAppInit);
+                        }
 
                         using (FileStream s = File.OpenWrite(regfile))
                         {
@@ -1031,10 +1059,14 @@ namespace renderdocui.Windows.Dialogs
                     }
                     else
                     {
-                        // if this is a 64-bit OS, it will re-direct our request to Wow6432Node anyway, so we
-                        // don't need to handle that manually
-                        EnableAppInit(Registry.LocalMachine.CreateSubKey("SOFTWARE"), path, "renderdocshim32.dll",
-                                        out prevAppInitEnabled, out prevAppInit);
+                        if (System.IO.File.Exists(Path.Combine(path, "renderdocshim32.dll")))
+                        {
+                            string dllPath = CopyFileToSystem32("renderdocshim32.dll", Path.Combine(path, "renderdocshim32.dll"));
+
+                            // if this is a 64-bit OS, it will re-direct our request to Wow6432Node anyway, so we
+                            // don't need to handle that manually
+                            EnableAppInit(Registry.LocalMachine.CreateSubKey("SOFTWARE"), dllPath, out prevAppInitEnabled, out prevAppInit);
+                        }
 
                         using (FileStream s = File.OpenWrite(regfile))
                         {
@@ -1172,6 +1204,9 @@ namespace renderdocui.Windows.Dialogs
                 var regfile = Path.Combine(Path.GetTempPath(), "RenderDoc_RestoreGlobalHook.reg");
 
                 if (File.Exists(regfile)) File.Delete(regfile);
+
+                DeleteFileFromSystem32("renderdocshim64.dll");
+                DeleteFileFromSystem32("renderdocshim32.dll");
             }
 
             toggleGlobalHook.Enabled = true;

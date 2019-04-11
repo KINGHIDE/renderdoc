@@ -38,6 +38,8 @@ struct CaptureOptions;
 typedef void(__cdecl *pRENDERDOC_SetCaptureOptions)(const CaptureOptions *opts);
 typedef void(__cdecl *pRENDERDOC_SetLogFile)(const char *logfile);
 
+#define LOGPRINT(txt) OutputDebugStringW(txt)
+/*
 #if defined(RELEASE)
 #define LOGPRINT(txt) \
   do                  \
@@ -51,9 +53,13 @@ typedef void(__cdecl *pRENDERDOC_SetLogFile)(const char *logfile);
   {                   \
   } while(0)
 #endif
+*/
 
 void CheckHook()
 {
+  DWORD dwProcessId = GetCurrentProcessId();
+  LOGPRINT(L"renderdocshim: CheckHook\n");
+
   ShimData *data = NULL;
 
   HANDLE datahandle = OpenFileMappingA(FILE_MAP_READ, FALSE, GLOBAL_HOOK_DATA_NAME);
@@ -158,6 +164,8 @@ DWORD CheckHookThread(LPVOID param)
 
 BOOL APIENTRY dll_entry(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
+  // LOGPRINT(L"renderdocshim: dll_main\n");
+
   if(ul_reason_for_call == DLL_PROCESS_ATTACH)
   {
     DisableThreadLibraryCalls(hModule);
